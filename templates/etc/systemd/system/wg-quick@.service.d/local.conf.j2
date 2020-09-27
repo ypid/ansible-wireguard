@@ -1,0 +1,7 @@
+{# Copyright (C) 2020 Robin Schneider <ypid@riseup.net>
+ # Copyright (C) 2020 DebOps <https://debops.org/>
+ # SPDX-License-Identifier: GPL-3.0-or-later
+ #}
+[Service]
+ExecReload=
+ExecReload=/bin/bash -c 'exec /usr/bin/wg syncconf %i <(exec {{ ansible_local.fhs.bin|d("/usr/local/bin") + "/wg-quick" }} strip-and-eval %i)'

@@ -7,6 +7,14 @@ SPDX-License-Identifier: GPL-3.0-or-later
 ansible-role-wireguard
 ======================
 
+## DebOps integration
+
+The role is currently heavily reworked for increased flexibility and DebOps support. The idea is to merge this role in DebOps master at some point in time. Stage one is however just meant as a well designed POC which does not yet meet DebOps standards. In a second stage, the role should be reworked and merged into DebOps. For discussion on the role design see https://github.com/githubixx/ansible-role-wireguard.
+
+The reworked role should cover all valid use cases, for this, the code is complex but you can decide using a few inventory variables how you want to role to behave.
+
+## Previous not up-to-date docs follow
+
 This Ansible role is used in my blog series [Kubernetes the not so hard way with Ansible](https://www.tauceti.blog/post/kubernetes-the-not-so-hard-way-with-ansible-wireguard/) but can be used standalone of course. I use WireGuard and this Ansible role to setup a fully meshed VPN between all nodes of my little Kubernetes cluster. This VPN also includes two clients so that I can communicate securely with the Kubernetes API server. Also my Postfix mailserver running as K8s DaemonSet forwards mails to my internal Postfix through WireGuard VPN.
 
 I used [PeerVPN](https://peervpn.net/) before but that wasn't updated for a while. As I moved my cloud hosts from Scaleway to Hetzner cloud it was a good time to switch the VPN solution ;-) In general PeerVPN still works perfectly fine esp. if you need a easy to setup fully meshed network (where every node is able to talk to all other nodes and even if node `A` should be able to talk to Node `C` via node `B` ;-) ). But PeerVPN needs also lot of CPU resources and throughput could be better. That's solved with [WireGuard](https://www.wireguard.io/).

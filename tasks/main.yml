@@ -1,11 +1,12 @@
 ---
 # Copyright (C) 2018-2020 Robert Wimmer
+# Copyright (C)      2020 Robin Schneider <ypid@riseup.net>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
-- name: Gather instance facts
-  setup:
+- import_role:
+    name: 'secret'
 
-# Installing WireGuard [[[1
+# Installing and load WireGuard [[[1
 - include_tasks: "{{ item }}"
   with_first_found:
     - "setup-{{ ansible_distribution|lower }}-{{ ansible_distribution_major_version }}.yml"
@@ -14,82 +15,145 @@
     - "setup-{{ ansible_distribution|lower }}.yml"
     - "setup-{{ ansible_os_family|lower }}.yml"
 
-- block:
-    - name: Enable WireGuard kernel module
-      modprobe:
-        name: wireguard
-        state: present
-      register: wireguard__register_module_enabled
-      until:  wireguard__register_module_enabled is succeeded
-      retries: 10
-      delay: 10
-      failed_when: wireguard__register_module_enabled is failure
-      tags:
-        - wg-install
-  when: not ansible_os_family == 'Darwin'
+- name: Install patched version of wg-quick
+  copy:
+    src: "usr/local/bin/wg-quick"
+    dest: '{{ ansible_local.fhs.bin|d("/usr/local/bin") + "/wg-quick" }}'
+    owner: "root"
+    group: "root"
+    mode: "0755"
+  tags:
+    - wg-install
 
-# Key handling [[[1
-- name: Register if config already exists on target host
-  stat:
-    path: "{{ wireguard_remote_directory }}/{{ wireguard_interface }}.conf"
-  register: wireguard__register_config_file
+- name: Enable WireGuard kernel module
+  modprobe:
+    name: wireguard
+    state: present
+  register: wireguard__register_module_enabled
+  until:  wireguard__register_module_enabled is succeeded
+  retries: 10
+  delay: 10
+  failed_when: wireguard__register_module_enabled is failure
+  when: ansible_os_family == 'Darwin'
+  tags:
+    - wg-install
+
+# Prepare WireGuard configuration directory [[[1
+- name: Create WireGuard configuration directory
+  file:
+    dest: "{{ wireguard_remote_directory }}"
+    state: directory
+    mode: 0700
+  tags:
+    - wg-config
+
+- name: Create WireGuard remote keys directory
+  file:
+    path: '{{ wireguard__keys_directory }}'
+    state: 'directory'
+    mode: '0700'
+  when: wireguard__key_templating == "file"
   tags:
     - wg-generate-keys
     - wg-config
 
-- name: Register if private key file already exists on target host
-  stat:
-    path: "{{ wireguard_remote_directory }}/{{ wireguard_interface }}.privkey"
-  register: wireguard__register_private_key_file
-  tags:
-    - wg-generate-keys
-    - wg-config
-
+# Private key handling on Ansible controller [[[1
 - block:
-  - name: Generate WireGuard private key
+  - name: Create secret directory on Ansible controller
+    file:
+      path: '{{ wireguard__secret_directory }}'
+      state: 'directory'
+      mode: '0777'
+    delegate_to: "localhost"
+    run_once: True
+    tags:
+      - wg-config
+
+  - name: Generate WireGuard private key on Ansible controller
+    shell: 'wg genkey > {{ (wireguard__secret_directory + "/" + item + ".privkey") | quote }}'
+    args:
+      creates: '{{ wireguard__secret_directory + "/" + item + ".privkey" }}'
+    delegate_to: "localhost"
+    run_once: True
+    loop: '{{ ansible_play_hosts }}'
+    tags:
+      - wg-config
+
+  - name: Read WireGuard private key from Ansible controller
+    slurp:
+      src: '{{ wireguard__secret_directory + "/" + inventory_hostname + ".privkey" }}'
+    delegate_to: "localhost"
+    register: wireguard__register_private_key
+
+  - name: Set private key fact from Ansible controller
+    set_fact:
+      wireguard__fact_private_key: "{{ wireguard__register_private_key['content'] | b64decode }}"
+  when: wireguard__secret_authority == "ansible_controller"
+
+# Private key handling on remote [[[1
+- block:
+  - name: Get WireGuard private key on remote
+    shell: |
+      set -o nounset -o pipefail -o errexit &&
+      wg-quick strip-and-eval {{ wireguard_interface | quote }} | sed --quiet 's/^PrivateKey\s*=\s*//p;'
+    args:
+      executable: 'bash'
+    register: wireguard__register_private_key
+
+  - name: Generate WireGuard private key on remote
     command: "wg genkey"
     register: wireguard__register_private_key
-    changed_when: false
+    changed_when: False
+    when: wireguard__register_config.rc|d(1) != 0
+    tags:
+      - wg-generate-keys
 
   - name: Set private key fact
     set_fact:
       wireguard__fact_private_key: "{{ wireguard__register_private_key.stdout }}"
-  when: not wireguard__register_config_file.stat.exists and not wireguard__register_private_key_file.stat.exists
-  tags:
-    - wg-generate-keys
+  when: wireguard__secret_authority == "host"
 
-- block:
-  - name: Read WireGuard config file
-    slurp:
-      src: "{{ wireguard_remote_directory }}/{{ wireguard_interface }}.conf"
-    register: wireguard__register_config
-
-  - name: Set private key fact from config file
-    set_fact:
-      wireguard__fact_private_key: "{{ wireguard__register_config['content'] | b64decode | regex_findall('PrivateKey = (.*)') | first }}"
-  when: wireguard__register_config_file.stat.exists and not wireguard__register_private_key_file.stat.exists
+# Save/remove private key from Ansible controller [[[1
+- name: Save WireGuard private key on Ansible controller
+  copy:
+    content: |
+      {{ wireguard__fact_private_key }}
+    dest: '{{ wireguard__secret_directory }}/{{ inventory_hostname }}.privkey'
+  delegate_to: "localhost"
+  no_log: True
+  when: wireguard__secret_authority == "ansible_controller"
   tags:
     - wg-config
 
-- block:
-  - name: Read WireGuard private key file
-    slurp:
-      src: "{{ wireguard_remote_directory }}/{{ wireguard_interface }}.privkey"
-    register: wireguard__register_config
-
-  - name: Set private key fact from file
-    set_fact:
-      wireguard__fact_private_key: "{{ wireguard__register_config['content'] | b64decode }}"
-  when: wireguard__register_private_key_file.stat.exists
+- name: Remove WireGuard private key from Ansible controller
+  file:
+    dest: '{{ wireguard__secret_directory }}/{{ inventory_hostname }}.privkey'
+    state: absent
+  when: wireguard__secret_authority == "host"
   tags:
     - wg-config
+
+# Public-private key handling on remote [[[1
+- name: Save WireGuard private key as separate file
+  copy:
+    content: |
+      {{ wireguard__fact_private_key }}
+    dest: "{{ wireguard__keys_directory }}/{{ wireguard_interface }}.privkey"
+    owner: "{{ wireguard_conf_owner }}"
+    group: "{{ wireguard_conf_group }}"
+    mode: "{{ wireguard_conf_mode }}"
+  no_log: True
+  tags:
+    - wg-config
+  notify:
+    - Reload WireGuard interface
 
 - name: Derive WireGuard public key
   command: "wg pubkey"
   args:
     stdin: "{{ wireguard__fact_private_key }}"
   register: wireguard__register_public_key
-  changed_when: false
+  changed_when: False
   tags:
     - wg-config
 
@@ -99,28 +163,38 @@
   tags:
     - wg-config
 
-# Configuration [[[1
-- name: Create WireGuard configuration directory
-  file:
-    dest: "{{ wireguard_remote_directory }}"
-    state: directory
-    mode: 0700
+# PSK handling [[[1
+- set_fact:
+    wireguard__combos: '{{ groups[wireguard_inventory_group]|d([]) | difference([inventory_hostname]) | product([inventory_hostname]) | map("sort") | map("join", ",") | list }}'
   tags:
     - wg-config
 
-- name: Save WireGuard private key as separate file
+- debug:
+    msg: '{{ wireguard__combos }}'
+  tags:
+    - wg-config
+
+- name: Derive WireGuard public key
+  shell: 'wg genpsk > {{ (wireguard__secret_directory + "/" + item + ".psk") | quote }}'
+  args:
+    creates: '{{ wireguard__secret_directory + "/" + item + ".psk" }}'
+  delegate_to: "localhost"
+  loop: '{{ wireguard__combos }}'
+  tags:
+    - wg-config
+
+- name: Download PSKs
   copy:
-    content: |
-      {{ wireguard__fact_private_key }}
-    dest: "{{ wireguard_remote_directory }}/{{ wireguard_interface }}.privkey"
+    src: '{{ wireguard__secret_directory + "/" + item + ".psk" }}'
+    dest: "{{ wireguard__keys_directory }}/{{ wireguard_interface }},{{ item }}.psk"
     owner: "{{ wireguard_conf_owner }}"
     group: "{{ wireguard_conf_group }}"
     mode: "{{ wireguard_conf_mode }}"
+  loop: '{{ wireguard__combos }}'
   tags:
     - wg-config
-  notify:
-    - Reload WireGuard interface
 
+# Configuration [[[1
 - name: Generate WireGuard configuration file
   template:
     src: etc/wireguard/wg.conf.j2
@@ -141,10 +215,16 @@
     - wg-config
 
 # Service [[[1
+- name: Create directory for drop-in file for wg-quick@.service
+  file:
+    dest: "/etc/systemd/system/wg-quick@.service.d"
+    state: directory
+    mode: 0755
+
 - name: Create systemd drop-in file for wg-quick@.service
-  copy:
-    src: "etc/systemd/system/wg-quick@.service.d"
-    dest: "/etc/systemd/system"
+  template:
+    src: "etc/systemd/system/wg-quick@.service.d/local.conf.j2"
+    dest: "/etc/systemd/system/wg-quick@.service.d/local.conf"
     owner: "root"
     group: "root"
     mode: "0644"
@@ -154,5 +234,27 @@
     daemon_reload: True
     name: "wg-quick@{{ wireguard_interface }}"
     state: started
-    enabled: yes
+    enabled: True
   when: not ansible_os_family == 'Darwin'
+
+# Save WireGuard local facts [[[1
+- name: Make sure that Ansible local facts directory exists
+  file:
+    path: '/etc/ansible/facts.d'
+    state: 'directory'
+    owner: 'root'
+    group: 'root'
+    mode: '0755'
+
+- name: Save WireGuard local facts
+  template:
+    src: 'etc/ansible/facts.d/wireguard.fact.j2'
+    dest: '/etc/ansible/facts.d/wireguard.fact'
+    owner: 'root'
+    group: 'root'
+    mode: '0755'
+  register: wireguard__register_facts
+
+- name: Update Ansible facts if they were modified
+  action: setup
+  when: wireguard__register_facts is changed

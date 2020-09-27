@@ -9,6 +9,8 @@
 # Directory to store WireGuard configuration on the remote hosts
 wireguard_remote_directory: "{{ '/etc/wireguard' if not ansible_os_family == 'Darwin' else '/opt/local/etc/wireguard' }}"
 
+wireguard__keys_directory: '{{ wireguard_remote_directory + "/keys" }}'
+
 # The default port WireGuard will listen if not specified otherwise.
 wireguard_port: "51820"
 
@@ -34,3 +36,53 @@ wireguard_ubuntu_update_cache: "true"
 
 # Set package cache valid time
 wireguard_ubuntu_cache_valid_time: "3600"
+
+#######################################
+# DebOps extensions
+#######################################
+
+# FIXME: Update docs
+# Name of the WireGuard network in case it is different to the interface name.
+# Might be the case if wg0 is already taken on some peers or if the network otherwise just has a more fitting name for the whole virtual network.
+wireguard_inventory_group: "wireguard_wg0"
+
+# Either "host" or "ansible_controller".
+wireguard__secret_authority: "ansible_controller"
+
+# Key templating mode. Either "inline" or "file".
+wireguard__key_templating: "file"
+
+# .. envvar:: wireguard__secret_directory [[[
+#
+# Secret directory to use on the Ansible controller for key management and
+# generating configuration files for unmanaged peers.
+wireguard__secret_directory: '{{ secret + "/wireguard/" + wireguard_inventory_group }}'
+ # +  + "/" + ansible_fqdn
+
+                                                                   # ]]]
+# Configuration for other Ansible roles [[[
+# -----------------------------------------
+
+# .. envvar:: wireguard__etc_services__dependent_list [[[
+#
+# Configuration for the :ref:`debops.etc_services` Ansible role.
+wireguard__etc_services__dependent_list:
+  - name: 'wireguard'
+    port: '{{ wireguard_port }}'
+    protocols: [ 'udp' ]
+    comment: 'WireGuard - fast, modern, secure kernel VPN tunnel'
+
+                                                                   # ]]]
+# .. envvar:: wireguard__ferm__dependent_rules [[[
+#
+# Configuration for the :ref:`debops.ferm` Ansible role.
+wireguard__ferm__dependent_rules:
+
+  - type: 'accept'
+    protocol: 'udp'
+    dport: '{{ wireguard_port }}'
+    accept_any: True
+    weight: '40'
+    name: 'wireguard'
+                                                                   # ]]]
+                                                                   # ]]]
