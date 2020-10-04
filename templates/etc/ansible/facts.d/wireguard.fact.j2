@@ -1,4 +1,5 @@
-#!{{ ansible_python['executable'] }}
+#!/usr/bin/python3
+## FIXME #!{{ ansible_python['executable'] }}
 # -*- coding: utf-8 -*-
 
 # Copyright (C) 2020 Robin Schneider <ypid@riseup.net>
@@ -8,23 +9,41 @@
 # {{ ansible_managed }}
 
 from __future__ import print_function
-from json import loads, dumps
-from sys import exit
 
-{% set facts_interfaces = {} %}
-{% for host in ansible_play_hosts %}
-{%   set _ = facts_interfaces.update({
-    wireguard_interface: {
-        'Interface': {
-            'PublicKey': hostvars[host].wireguard__fact_public_key,
-        }
-    }
-}) %}
-{% endfor %}
+from future import standard_library
+standard_library.install_aliases()
+import subprocess
+import pathlib
+import collections
 
-output = loads('''{
-    "installed": true,
-    "interface": {{ facts_interfaces | to_json }}
-}''')
+from configparser import ConfigParser
+from json import dumps
+from glob import glob
+
+output = {
+    'installed': True,
+    'interface': collections.defaultdict(dict),
+}
+
+for wg_conf in glob('/etc/wireguard/*.conf'):
+    wg_conf = pathlib.Path(wg_conf)
+    interface = wg_conf.stem
+    config_string = subprocess.check_output(
+        ['/usr/local/bin/wg-quick', 'strip-and-eval', interface],
+        stderr=subprocess.PIPE,
+        shell=False,
+    ).decode('utf8')
+    config = ConfigParser()
+    config.read_string(config_string)
+
+    pubkey = subprocess.check_output(
+        ['wg', 'pubkey'],
+        input=config.get('Interface', 'PrivateKey').encode('utf8'),
+        stderr=subprocess.PIPE,
+        shell=False,
+    ).decode('utf8')
+
+    output['interface'][interface].setdefault('Interface', {})
+    output['interface'][interface]['Interface']['PublicKey'] = pubkey
 
 print(dumps(output, sort_keys=True, indent=4))
