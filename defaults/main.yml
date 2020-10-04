@@ -67,9 +67,9 @@ wireguard__config_target: 'host'
 # File path on the Ansible controller where files will be redirected to with wireguard__config_target == "ansible_controller".
 # The idea behind this directory is to act as a faked / (root) directory for that "host".
 wireguard__controller_host_dir_path: '{{ (inventory_dir + "../../../root-fs-by-host/" + inventory_hostname) | realpath }}'
-wireguard__controller_host_owner: '{{ omit}}'
-wireguard__controller_host_group: '{{ omit}}'
-wireguard__controller_host_mode: '{{ omit}}'
+wireguard__controller_host_owner: '{{ omit }}'
+wireguard__controller_host_group: '{{ omit }}'
+wireguard__controller_host_mode: '{{ omit }}'
 
 # .. envvar:: wireguard__secret_directory [[[
 #
