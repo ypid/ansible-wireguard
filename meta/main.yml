@@ -1,26 +1,43 @@
 # Copyright (C) 2018-2020 Robert Wimmer
+# Copyright (C)      2020 Robin Schneider <ypid@riseup.net>
+# Copyright (C)      2020 DebOps <https://debops.org/>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
+# Ensure that custom Ansible plugins and modules included in the main DebOps
+# collection are available to roles in other collections.
+collections: [ 'debops.debops' ]
+
+dependencies: []
+
 galaxy_info:
-  author: Robert Wimmer
-  description: Installs Wireguard incl. systemd integration
+
+  role_name: 'wireguard'
+  author: 'Robert Wimmer, Robin Schneider'
+  description: 'Deploy and configure WireGuard VPN tunnels'
+  company: 'DebOps'
   license: GPL-3.0-or-later
-  min_ansible_version: 2.5
+  min_ansible_version: 2.8
   platforms:
-  - name: ArchLinux
-  - name: Ubuntu
-    versions:
-    - bionic
-    - focal
-  - name: Debian
-    versions:
-    - buster
-  - name: EL
-    versions:
-    - 7
-  - name: Fedora
-    versions:
-    - 31
+
+    - name: ArchLinux
+
+    - name: Ubuntu
+      versions:
+      - bionic
+      - focal
+
+    - name: Debian
+      versions:
+      - buster
+
+    - name: EL
+      versions:
+      - 7
+
+    - name: Fedora
+      versions:
+      - 31
+
   galaxy_tags:
     - networking
     - security
