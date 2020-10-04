@@ -25,7 +25,7 @@ output = {
     'interface': collections.defaultdict(dict),
 }
 
-for wg_conf in glob('/etc/wireguard/*.conf'):
+for wg_conf in glob('{{ wireguard_remote_directory }}/*.conf'):
     wg_conf = pathlib.Path(wg_conf)
     interface = wg_conf.stem
     config_string = subprocess.check_output(
