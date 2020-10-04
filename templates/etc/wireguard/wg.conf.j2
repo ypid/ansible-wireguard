@@ -12,12 +12,10 @@ Address = {{ wireguard_address }}
 PrivateKey = {{ wireguard__fact_private_key }}
 {% else %}
 PostUp = wg set %i private-key {{ wireguard__keys_directory }}/%i.privkey
-{% for host in wireguard__peers %}
-{%   if host != inventory_hostname %}
+{%   for host in wireguard__peers %}
 PostUp = wg set %i peer {{ hostvars[host].wireguard__fact_public_key
                            |d(hostvars[host].ansible_local.wireguard.interface[hostvars[host].wireguard_interface].Interface.PublicKey) }} preshared-key {{ wireguard__keys_directory }}/%i,{{ [inventory_hostname, host] | sort | join(",") }}.psk
-{%   endif %}
-{% endfor %}
+{%   endfor %}
 {% endif %}
 ListenPort = {{ wireguard_port }}
 {% if wireguard_dns is defined %}
@@ -56,43 +54,41 @@ PostDown = {{ wg_postdown }}
 SaveConfig = true
 {% endif %}
 {% for host in wireguard__peers %}
-{%   if host != inventory_hostname %}
 
 [Peer]
 # {{ host }}
 PublicKey = {{ hostvars[host].wireguard__fact_public_key
                |d(hostvars[host].ansible_local.wireguard.interface[hostvars[host].wireguard_interface].Interface.PublicKey) }}
-{%     if wireguard__key_templating == 'inline' and host in wireguard__fact_psks %}
+{%   if wireguard__key_templating == 'inline' and host in wireguard__fact_psks %}
 PresharedKey = {{ wireguard__fact_psks[host] }}
-{%     endif %}
-{%     if hostvars[host].wireguard_allowed_ips|d() %}
-AllowedIPs = {{ hostvars[host].wireguard_allowed_ips }}
-{%     else %}
+{%   endif %}
+{%   if hostvars[host].wireguard_allowed_ips|d() %}
+AllowedIPs = {{ [ hostvars[host].wireguard_allowed_ips ] | flatten | join(", ") }}
+{%   else %}
 AllowedIPs = {{ hostvars[host].wireguard_address.split('/')[0] }}/32
-{%     endif %}
-{%     if hostvars[host].wireguard_persistent_keepalive is defined %}
+{%   endif %}
+{%   if hostvars[host].wireguard_persistent_keepalive is defined %}
 PersistentKeepalive = {{ hostvars[host].wireguard_persistent_keepalive }}
-{%     endif %}
-{%     if (
+{%   endif %}
+{%   if (
          hostvars[host].wireguard_dc is defined and
          wireguard_dc is defined and
          wireguard_dc['name'] != hostvars[host].wireguard_dc['name']
        )
 %}
 Endpoint = {{ hostvars[host].wireguard_dc['endpoint'] }}:{{ hostvars[host].wireguard_dc['port'] }}
-{%     elif hostvars[host].wireguard_port is defined and hostvars[host].wireguard_port is number %}
-{%       if hostvars[host].wireguard_endpoint is defined and hostvars[host].wireguard_endpoint != "" %}
+{%   elif hostvars[host].wireguard_port is defined and hostvars[host].wireguard_port is number %}
+{%     if hostvars[host].wireguard_endpoint is defined and hostvars[host].wireguard_endpoint != "" %}
 Endpoint = {{ hostvars[host].wireguard_endpoint }}:{{ hostvars[host].wireguard_port }}
-{%       else %}
-Endpoint = {{ host }}:{{ hostvars[host].wireguard_port }}
-{%       endif %}
-{%     elif hostvars[host].wireguard_endpoint is defined and hostvars[host].wireguard_endpoint != "" %}
-Endpoint = {{ hostvars[host].wireguard_endpoint }}:{{ wireguard_port }}
-{%     elif hostvars[host].wireguard_endpoint == "" %}
-# No endpoint defined for this peer
 {%     else %}
-Endpoint = {{ host }}:{{ wireguard_port }}
+Endpoint = {{ host }}:{{ hostvars[host].wireguard_port }}
 {%     endif %}
+{%   elif hostvars[host].wireguard_endpoint is defined and hostvars[host].wireguard_endpoint != "" %}
+Endpoint = {{ hostvars[host].wireguard_endpoint }}:{{ wireguard_port }}
+{%   elif hostvars[host].wireguard_endpoint == "" %}
+# No endpoint defined for this peer
+{%   else %}
+Endpoint = {{ host }}:{{ wireguard_port }}
 {%   endif %}
 {% endfor %}
 {% if wireguard_unmanaged_peers is defined %}

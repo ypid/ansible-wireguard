@@ -13,7 +13,7 @@ wireguard_remote_directory: '{{ ("/opt/local/etc/wireguard"
                                  if (ansible_os_family == "Darwin")
                                  else "/etc/wireguard")
                                 if (wireguard__config_target == "host")
-                                else (wireguard__secret_directory + "/config") }}'
+                                else (wireguard__secret_directory + "/config_" + inventory_hostname) }}'
 
 
 wireguard__keys_directory: '{{ wireguard_remote_directory + "/keys" }}'
@@ -54,9 +54,10 @@ wireguard_ubuntu_cache_valid_time: "3600"
 wireguard_inventory_group: 'wireguard_wg0'
 
 # List of peers.
-wireguard__peers: '{{ groups[wireguard_inventory_group]|d([]) }}'
+wireguard__peers: '{{ groups[wireguard_inventory_group]|d([]) | difference([inventory_hostname]) }}'
 
 # Either "host" or "ansible_controller".
+# Note that PSK is currently only supported for "ansible_controller".
 wireguard__secret_authority: 'ansible_controller'
 
 # Key templating mode. Either "inline" or "file".

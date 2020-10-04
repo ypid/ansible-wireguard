@@ -72,7 +72,7 @@
     file:
       path: '{{ wireguard__secret_directory }}'
       state: 'directory'
-      mode: '0777'
+      mode: '0700'
     delegate_to: "localhost"
     run_once: True
     tags:
@@ -84,7 +84,7 @@
       creates: '{{ wireguard__secret_directory + "/" + item + ".privkey" }}'
     delegate_to: "localhost"
     run_once: True
-    loop: '{{ wireguard__peers }}'
+    loop: '{{ wireguard__peers + [inventory_hostname] }}'
     tags:
       - wg-config
 
@@ -175,12 +175,12 @@
 
 # PSK handling [[[1
 - set_fact:
-    wireguard__combos: '{{ wireguard__peers | difference([inventory_hostname]) | product([inventory_hostname]) | map("sort") | map("join", ",") | list }}'
+    wireguard__combos: '{{ wireguard__peers | product([inventory_hostname]) | map("sort") | map("join", ",") | list }}'
   tags:
     - wg-config
     - test
 
-- name: Derive WireGuard public key
+- name: Generate WireGuard PSKs
   shell: 'wg genpsk > {{ (wireguard__secret_directory + "/" + item + ".psk") | quote }}'
   args:
     creates: '{{ wireguard__secret_directory + "/" + item + ".psk" }}'
@@ -239,7 +239,7 @@
 - name: Generate WireGuard configuration file on Ansible controller
   template:
     src: 'etc/wireguard/wg.conf.j2'
-    dest: '{{ wireguard_remote_directory + "/" + inventory_hostname + "_" + wireguard_interface + ".conf" }}'
+    dest: '{{ wireguard_remote_directory + "/" + wireguard_interface + ".conf" }}'
   when: wireguard__config_target == "ansible_controller"
   tags:
     - wg-config
