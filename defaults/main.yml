@@ -52,6 +52,9 @@ wireguard_ubuntu_cache_valid_time: "3600"
 # Might be the case if wg0 is already taken on some peers or if the network otherwise just has a more fitting name for the whole virtual network.
 wireguard_inventory_group: 'wireguard_wg0'
 
+# List of peers.
+wireguard__peers: '{{ groups[wireguard_inventory_group]|d([]) }}'
+
 # Either "host" or "ansible_controller".
 wireguard__secret_authority: 'ansible_controller'
 

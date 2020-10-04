@@ -84,7 +84,7 @@
       creates: '{{ wireguard__secret_directory + "/" + item + ".privkey" }}'
     delegate_to: "localhost"
     run_once: True
-    loop: '{{ groups[wireguard_inventory_group]|d([]) }}'
+    loop: '{{ wireguard__peers }}'
     tags:
       - wg-config
 
@@ -175,15 +175,10 @@
 
 # PSK handling [[[1
 - set_fact:
-    wireguard__combos: '{{ groups[wireguard_inventory_group]|d([]) | difference([inventory_hostname]) | product([inventory_hostname]) | map("sort") | map("join", ",") | list }}'
+    wireguard__combos: '{{ wireguard__peers | difference([inventory_hostname]) | product([inventory_hostname]) | map("sort") | map("join", ",") | list }}'
   tags:
     - wg-config
     - test
-
-- debug:
-    msg: '{{ wireguard__combos }}'
-  tags:
-    - wg-config
 
 - name: Derive WireGuard public key
   shell: 'wg genpsk > {{ (wireguard__secret_directory + "/" + item + ".psk") | quote }}'
@@ -212,8 +207,6 @@
         }) %}
         {% endfor %}
         {{ fact }}
-  - debug:
-      var: wireguard__fact_psks
   when: wireguard__secret_authority == "ansible_controller"
   tags: test
 
