@@ -91,10 +91,10 @@ parse_options() {
 			SaveConfig) read_bool SAVE_CONFIG "$value"; continue ;;
 			esac
 		fi
+		WG_CONFIG+="$line"$'\n'
 		if [[ $interface_section -eq 0 && $key == 'PublicKey' && -n "${peer_pubkey_to_psk[$value]}" ]]; then
 			WG_CONFIG+="PresharedKey = ${peer_pubkey_to_psk[$value]}"$'\n'
 		fi
-		WG_CONFIG+="$line"$'\n'
 	done < "$CONFIG_FILE"
 	shopt -u nocasematch
 }
