@@ -6,4 +6,4 @@
   service:
     name: "wg-quick@{{ wireguard_interface }}"
     state: "reloaded"
-  when: (ansible_os_family != 'Darwin')
+  when: (wireguard__config_target == "host" and ansible_os_family != 'Darwin')

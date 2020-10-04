@@ -6,6 +6,13 @@
 - import_role:
     name: 'secret'
 
+- name: Assert that inventory configuration is valid
+  assert:
+    that:
+      - '(wireguard__config_target == "ansible_controller" and wireguard__secret_authority == "ansible_controller") or wireguard__config_target != "ansible_controller"'
+  run_once: True
+  delegate_to: 'localhost'
+
 # Installing and load WireGuard [[[1
 - include_tasks: "{{ item }}"
   with_first_found:
@@ -14,6 +21,7 @@
     - "setup-{{ ansible_distribution|lower }}-{{ ansible_distribution_release }}.yml"
     - "setup-{{ ansible_distribution|lower }}.yml"
     - "setup-{{ ansible_os_family|lower }}.yml"
+  when: wireguard__config_target == "host"
 
 - name: Install patched version of wg-quick
   copy:
@@ -24,6 +32,7 @@
     mode: "0755"
   tags:
     - wg-install
+  when: wireguard__config_target == "host"
 
 - name: Enable WireGuard kernel module
   modprobe:
@@ -34,14 +43,14 @@
   retries: 10
   delay: 10
   failed_when: wireguard__register_module_enabled is failure
-  when: ansible_os_family == 'Darwin'
+  when: wireguard__config_target == "host" and ansible_os_family == 'Darwin'
   tags:
     - wg-install
 
 # Prepare WireGuard configuration directory [[[1
 - name: Create WireGuard configuration directory
   file:
-    dest: "{{ wireguard_remote_directory }}"
+    dest: '{{ wireguard_remote_directory }}'
     state: directory
     mode: 0700
   tags:
@@ -75,7 +84,7 @@
       creates: '{{ wireguard__secret_directory + "/" + item + ".privkey" }}'
     delegate_to: "localhost"
     run_once: True
-    loop: '{{ ansible_play_hosts }}'
+    loop: '{{ groups[wireguard_inventory_group]|d([]) }}'
     tags:
       - wg-config
 
@@ -87,7 +96,7 @@
 
   - name: Set private key fact from Ansible controller
     set_fact:
-      wireguard__fact_private_key: "{{ wireguard__register_private_key['content'] | b64decode }}"
+      wireguard__fact_private_key: '{{ (wireguard__register_private_key["content"] | b64decode).strip() }}'
   when: wireguard__secret_authority == "ansible_controller"
 
 # Private key handling on remote [[[1
@@ -143,6 +152,7 @@
     group: "{{ wireguard_conf_group }}"
     mode: "{{ wireguard_conf_mode }}"
   no_log: True
+  when: wireguard__key_templating == "file"
   tags:
     - wg-config
   notify:
@@ -159,7 +169,7 @@
 
 - name: Set public key fact
   set_fact:
-    wireguard__fact_public_key: "{{ wireguard__register_public_key.stdout }}"
+    wireguard__fact_public_key: '{{ wireguard__register_public_key.stdout }}'
   tags:
     - wg-config
 
@@ -215,6 +225,7 @@
     group: "{{ wireguard_conf_group }}"
     mode: "{{ wireguard_conf_mode }}"
   loop: '{{ wireguard__combos }}'
+  when: wireguard__config_target == "host"
   tags:
     - wg-config
 
@@ -226,15 +237,25 @@
     owner: "{{ wireguard_conf_owner }}"
     group: "{{ wireguard_conf_group }}"
     mode: "{{ wireguard_conf_mode }}"
+  when: wireguard__config_target == "host"
   tags:
     - wg-config
   notify:
     - Reload WireGuard interface
 
+- name: Generate WireGuard configuration file on Ansible controller
+  template:
+    src: 'etc/wireguard/wg.conf.j2'
+    dest: '{{ wireguard_remote_directory + "/" + inventory_hostname + "_" + wireguard_interface + ".conf" }}'
+  when: wireguard__config_target == "ansible_controller"
+  tags:
+    - wg-config
+
 - name: Ensure legacy reload-module-on-update is absent
   file:
     dest: "{{ wireguard_remote_directory }}/.reload-module-on-update"
     state: absent
+  when: wireguard__config_target == "host"
   tags:
     - wg-config
 
@@ -244,6 +265,7 @@
     dest: "/etc/systemd/system/wg-quick@.service.d"
     state: directory
     mode: 0755
+  when: wireguard__config_target == "host"
 
 - name: Create systemd drop-in file for wg-quick@.service
   template:
@@ -252,6 +274,7 @@
     owner: "root"
     group: "root"
     mode: "0644"
+  when: wireguard__config_target == "host"
 
 - name: Start and enable WireGuard service
   service:
@@ -259,26 +282,48 @@
     name: "wg-quick@{{ wireguard_interface }}"
     state: started
     enabled: True
-  when: not ansible_os_family == 'Darwin'
+  when: (wireguard__config_target == "host" and ansible_os_family != 'Darwin')
 
 # Save WireGuard local facts [[[1
 - name: Make sure that Ansible local facts directory exists
   file:
-    path: '/etc/ansible/facts.d'
+    path: '{{ (wireguard__controller_host_dir_path
+               if (wireguard__config_target == "ansible_controller")
+               else "") + "/etc/ansible/facts.d" }}'
     state: 'directory'
-    owner: 'root'
-    group: 'root'
-    mode: '0755'
+    owner: '{{ wireguard__controller_host_owner
+               if (wireguard__config_target == "ansible_controller")
+               else "root" }}'
+    group: '{{ wireguard__controller_host_group
+               if (wireguard__config_target == "ansible_controller")
+               else "root" }}'
+    mode: '{{ wireguard__controller_host_mode
+              if (wireguard__config_target == "ansible_controller")
+              else "0755" }}'
 
 - name: Save WireGuard local facts
   template:
-    src: 'etc/ansible/facts.d/wireguard.fact.j2'
-    dest: '/etc/ansible/facts.d/wireguard.fact'
-    owner: 'root'
-    group: 'root'
-    mode: '0755'
+    src: '{{ "etc/ansible/facts.d/" +
+             ("wireguard_static.fact.j2"
+              if (wireguard__config_target == "ansible_controller")
+              else "wireguard.fact.j2") }}'
+    dest: '{{ (wireguard__controller_host_dir_path
+               if (wireguard__config_target == "ansible_controller")
+               else "") + "/etc/ansible/facts.d/wireguard.fact" }}'
+    owner: '{{ wireguard__controller_host_owner
+               if (wireguard__config_target == "ansible_controller")
+               else "root" }}'
+    group: '{{ wireguard__controller_host_group
+               if (wireguard__config_target == "ansible_controller")
+               else "root" }}'
+    mode: '{{ "0644"
+              if (wireguard__config_target == "ansible_controller")
+              else "0755" }}'
   register: wireguard__register_facts
 
 - name: Update Ansible facts if they were modified
-  action: setup
+  setup:
+    fact_path: '{{ (wireguard__controller_host_dir_path + "/etc/ansible/facts.d")
+                   if (wireguard__config_target == "ansible_controller")
+                   else omit }}'
   when: wireguard__register_facts is changed

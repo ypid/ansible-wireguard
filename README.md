@@ -13,6 +13,8 @@ The role is currently heavily reworked for increased flexibility and DebOps supp
 
 The reworked role should cover all valid use cases, for this, the code is complex but you can decide using a few inventory variables how you want to role to behave.
 
+You will need to have `python3-future` installed on your remote hosts.
+
 ## Previous not up-to-date docs follow
 
 This Ansible role is used in my blog series [Kubernetes the not so hard way with Ansible](https://www.tauceti.blog/post/kubernetes-the-not-so-hard-way-with-ansible-wireguard/) but can be used standalone of course. I use WireGuard and this Ansible role to setup a fully meshed VPN between all nodes of my little Kubernetes cluster. This VPN also includes two clients so that I can communicate securely with the Kubernetes API server. Also my Postfix mailserver running as K8s DaemonSet forwards mails to my internal Postfix through WireGuard VPN.

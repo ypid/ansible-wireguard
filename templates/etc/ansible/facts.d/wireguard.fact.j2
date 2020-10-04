@@ -33,7 +33,7 @@ for wg_conf in glob('/etc/wireguard/*.conf'):
         stderr=subprocess.PIPE,
         shell=False,
     ).decode('utf8')
-    config = ConfigParser()
+    config = ConfigParser(strict=False)
     config.read_string(config_string)
 
     pubkey = subprocess.check_output(
@@ -41,7 +41,7 @@ for wg_conf in glob('/etc/wireguard/*.conf'):
         input=config.get('Interface', 'PrivateKey').encode('utf8'),
         stderr=subprocess.PIPE,
         shell=False,
-    ).decode('utf8')
+    ).decode('utf8').strip()
 
     output['interface'][interface].setdefault('Interface', {})
     output['interface'][interface]['Interface']['PublicKey'] = pubkey

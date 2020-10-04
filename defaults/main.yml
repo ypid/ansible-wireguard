@@ -1,5 +1,6 @@
 ---
 # Copyright (C) 2018-2020 Robert Wimmer
+# Copyright (C)      2020 Robin Schneider <ypid@riseup.net>
 # SPDX-License-Identifier: GPL-3.0-or-later
 
 #######################################
@@ -7,7 +8,12 @@
 #######################################
 
 # Directory to store WireGuard configuration on the remote hosts
-wireguard_remote_directory: "{{ '/etc/wireguard' if not ansible_os_family == 'Darwin' else '/opt/local/etc/wireguard' }}"
+wireguard_remote_directory: '{{ ("/opt/local/etc/wireguard"
+                                 if (ansible_os_family == "Darwin")
+                                 else "/etc/wireguard")
+                                if (wireguard__config_target == "host")
+                                else (wireguard__secret_directory + "/config") }}'
+
 
 wireguard__keys_directory: '{{ wireguard_remote_directory + "/keys" }}'
 
@@ -44,20 +50,29 @@ wireguard_ubuntu_cache_valid_time: "3600"
 # FIXME: Update docs
 # Name of the WireGuard network in case it is different to the interface name.
 # Might be the case if wg0 is already taken on some peers or if the network otherwise just has a more fitting name for the whole virtual network.
-wireguard_inventory_group: "wireguard_wg0"
+wireguard_inventory_group: 'wireguard_wg0'
 
 # Either "host" or "ansible_controller".
-wireguard__secret_authority: "ansible_controller"
+wireguard__secret_authority: 'ansible_controller'
 
 # Key templating mode. Either "inline" or "file".
-wireguard__key_templating: "file"
+wireguard__key_templating: '{{ "file" if (wireguard__config_target == "host") else "inline" }}'
+
+# Either "host" or "ansible_controller".
+wireguard__config_target: 'host'
+
+# File path on the Ansible controller where files will be redirected to with wireguard__config_target == "ansible_controller".
+# The idea behind this directory is to act as a faked / (root) directory for that "host".
+wireguard__controller_host_dir_path: '{{ (inventory_dir + "../../../root-fs-by-host/" + inventory_hostname) | realpath }}'
+wireguard__controller_host_owner: '{{ omit}}'
+wireguard__controller_host_group: '{{ omit}}'
+wireguard__controller_host_mode: '{{ omit}}'
 
 # .. envvar:: wireguard__secret_directory [[[
 #
 # Secret directory to use on the Ansible controller for key management and
 # generating configuration files for unmanaged peers.
 wireguard__secret_directory: '{{ secret + "/wireguard/" + wireguard_inventory_group }}'
- # +  + "/" + ansible_fqdn
 
                                                                    # ]]]
 # Configuration for other Ansible roles [[[

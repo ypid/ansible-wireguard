@@ -12,9 +12,10 @@ Address = {{ wireguard_address }}
 PrivateKey = {{ wireguard__fact_private_key }}
 {% else %}
 PostUp = wg set %i private-key {{ wireguard__keys_directory }}/%i.privkey
-{% for host in ansible_play_hosts %}
+{% for host in groups[wireguard_inventory_group]|d([]) %}
 {%   if host != inventory_hostname %}
-PostUp = wg set %i peer {{ hostvars[host].wireguard__fact_public_key }} preshared-key {{ wireguard__keys_directory }}/%i,{{ [inventory_hostname, host] | sort | join(",") }}.psk
+PostUp = wg set %i peer {{ hostvars[host].wireguard__fact_public_key
+                           |d(hostvars[host].ansible_local.wireguard.interface[hostvars[host].wireguard_interface].Interface.PublicKey) }} preshared-key {{ wireguard__keys_directory }}/%i,{{ [inventory_hostname, host] | sort | join(",") }}.psk
 {%   endif %}
 {% endfor %}
 {% endif %}
@@ -54,12 +55,13 @@ PostDown = {{ wg_postdown }}
 {% if wireguard_save_config is defined %}
 SaveConfig = true
 {% endif %}
-{% for host in ansible_play_hosts %}
+{% for host in groups[wireguard_inventory_group]|d([]) %}
 {%   if host != inventory_hostname %}
 
 [Peer]
 # {{ host }}
-PublicKey = {{ hostvars[host].wireguard__fact_public_key }}
+PublicKey = {{ hostvars[host].wireguard__fact_public_key
+               |d(hostvars[host].ansible_local.wireguard.interface[hostvars[host].wireguard_interface].Interface.PublicKey) }}
 {%     if wireguard__key_templating == 'inline' and host in wireguard__fact_psks %}
 PresharedKey = {{ wireguard__fact_psks[host] }}
 {%     endif %}
