@@ -20,7 +20,9 @@ PostUp = wg set %i peer {{ hostvars[host].wireguard__fact_public_key
                            |d(hostvars[host].ansible_local.wireguard.interface[hostvars[host].wireguard_interface].Interface.PublicKey) }} preshared-key {{ wireguard__keys_directory_maybe_relative }}/%i,{{ [inventory_hostname, host] | sort | join(",") }}.psk
 {%   endfor %}
 {% endif %}
+{% if wireguard_port != omit %}
 ListenPort = {{ wireguard_port }}
+{% endif %}
 {% if wireguard_dns is defined %}
 DNS = {{ wireguard_dns }}
 {% endif %}
