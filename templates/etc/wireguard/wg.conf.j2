@@ -20,8 +20,8 @@ PostUp = wg set %i peer {{ hostvars[host].wireguard__fact_public_key
 {% if wireguard_port != omit %}
 ListenPort = {{ wireguard_port }}
 {% endif %}
-{% if wireguard_dns is defined %}
-DNS = {{ wireguard_dns }}
+{% if wireguard_dns|d() != '' %}
+DNS = {{ [ wireguard_dns ] | flatten | join(", ") }}
 {% endif %}
 {% if wireguard_fwmark is defined %}
 FwMark = {{ wireguard_fwmark }}
