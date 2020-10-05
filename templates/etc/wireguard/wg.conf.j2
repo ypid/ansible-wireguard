@@ -11,13 +11,10 @@ Address = {{ wireguard_address }}
 {% if wireguard__key_templating == 'inline' %}
 PrivateKey = {{ wireguard__fact_private_key }}
 {% else %}
-{%   set wireguard__keys_directory_maybe_relative = (wireguard__keys_directory | replace(wireguard_remote_directory, '.'))
-                                                    if (wireguard__keys_directory.startswith(wireguard_remote_directory))
-                                                    else (wireguard__keys_directory) %}
-PostUp = wg set %i private-key {{ wireguard__keys_directory_maybe_relative }}/%i.privkey
+PostUp = wg set %i private-key {{ wireguard__keys_directory }}/%i.privkey
 {%   for host in wireguard__peers %}
 PostUp = wg set %i peer {{ hostvars[host].wireguard__fact_public_key
-                           |d(hostvars[host].ansible_local.wireguard.interface[hostvars[host].wireguard_interface].Interface.PublicKey) }} preshared-key {{ wireguard__keys_directory_maybe_relative }}/%i,{{ [inventory_hostname, host] | sort | join(",") }}.psk
+                           |d(hostvars[host].ansible_local.wireguard.interface[hostvars[host].wireguard_interface].Interface.PublicKey) }} preshared-key {{ wireguard__keys_directory }}/%i,{{ [inventory_hostname, host] | sort | join(",") }}.psk
 {%   endfor %}
 {% endif %}
 {% if wireguard_port != omit %}
