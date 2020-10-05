@@ -91,7 +91,7 @@ Endpoint = {{ host }}:{{ hostvars[host].wireguard_port }}
 {%   elif hostvars[host].wireguard_endpoint is defined and hostvars[host].wireguard_endpoint != "" %}
 Endpoint = {{ hostvars[host].wireguard_endpoint }}:{{ wireguard_port }}
 {%   elif hostvars[host].wireguard_endpoint == "" %}
-# No endpoint defined for this peer
+# No endpoint defined for this peer.
 {%   else %}
 Endpoint = {{ host }}:{{ wireguard_port }}
 {%   endif %}
