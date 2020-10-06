@@ -1,0 +1,42 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+# Copyright (C) 2020 Robin Schneider <ypid@riseup.net>
+# Copyright (C) 2020 DebOps <https://debops.org/>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+"""
+Simple WireGuard INI configuration file validator.
+
+Nothing fancy. We could pull in a fully blown WireGuard config parser Python
+package but none is packaged in Debian yet so that would require external
+dependencies. Therefore this trade-off was chosen.
+
+I first considered using wg-quick but this only parses custom options.
+Everything else is just paste to wg(8).
+"""
+
+from __future__ import (print_function, unicode_literals,
+                        absolute_import, division)
+
+import argparse
+
+from configparser import ConfigParser
+
+__version__ = '0.1.0'
+
+
+def main():
+    args_parser = argparse.ArgumentParser(description=__doc__)
+    args_parser.add_argument('-f', '--file', required=True)
+    args_parser.add_argument(
+        '-V', '--version', action='version',
+        version='%(prog)s {}'.format(__version__))
+    cli_args = args_parser.parse_args()
+
+    config = ConfigParser(strict=False)
+    config.read(cli_args.file)
+
+
+if __name__ == '__main__':
+    main()

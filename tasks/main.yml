@@ -25,11 +25,22 @@
 
 - name: Install patched version of wg-quick
   copy:
-    src: "usr/local/bin/wg-quick"
+    src: 'usr/local/bin/wg-quick'
     dest: '{{ ansible_local.fhs.bin|d("/usr/local/bin") + "/wg-quick" }}'
-    owner: "root"
-    group: "root"
-    mode: "0755"
+    owner: 'root'
+    group: 'root'
+    mode: '0755'
+  tags:
+    - wg-install
+  when: wireguard__config_target == "host"
+
+- name: Install wg-validate-config
+  copy:
+    src: 'usr/local/lib/wg-validate-config'
+    dest: '{{ wireguard__config_validator }}'
+    owner: 'root'
+    group: 'root'
+    mode: '0755'
   tags:
     - wg-install
   when: wireguard__config_target == "host"
@@ -230,6 +241,7 @@
     owner: "{{ wireguard_conf_owner }}"
     group: "{{ wireguard_conf_group }}"
     mode: "{{ wireguard_conf_mode }}"
+    validate: '{{ wireguard__config_validator }} --file %s'
   when: wireguard__config_target == "host"
   tags:
     - wg-config
@@ -240,6 +252,7 @@
   template:
     src: 'etc/wireguard/wg.conf.j2'
     dest: '{{ wireguard_remote_directory + "/" + wireguard_interface + ".conf" }}'
+    validate: '{{ role_path }}/files/usr/local/lib/wg-validate-config --file %s'
   when: wireguard__config_target == "ansible_controller"
   tags:
     - wg-config

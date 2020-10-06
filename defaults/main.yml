@@ -73,6 +73,10 @@ wireguard__controller_host_owner: '{{ omit }}'
 wireguard__controller_host_group: '{{ omit }}'
 wireguard__controller_host_mode: '{{ omit }}'
 
+wireguard__config_validator: '{{ ansible_local.fhs.lib|d("/usr/local/lib") + "/wg-validate-config" }}'
+
+
+
 # .. envvar:: wireguard__secret_directory [[[
 #
 # Secret directory to use on the Ansible controller for key management and
