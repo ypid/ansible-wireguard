@@ -65,7 +65,7 @@ PublicKey = {{ hostvars[host].wireguard__fact_public_key
 PresharedKey = {{ wireguard__fact_psks[host] }}
 {%   endif %}
 {%   if hostvars[host].wireguard_allowed_ips|d() %}
-AllowedIPs = {{ [ hostvars[host].wireguard_allowed_ips ] | flatten | join(", ") }}
+AllowedIPs = {{ [ hostvars[host].wireguard_allowed_ips ] | flatten | map("trim") | join(", ") }}
 {%   else %}
 AllowedIPs = {{ hostvars[host].wireguard_address.split('/')[0] }}/32
 {%   endif %}
