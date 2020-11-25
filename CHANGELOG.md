@@ -6,6 +6,12 @@ SPDX-License-Identifier: GPL-3.0-or-later
 Changelog
 ---------
 
+**7.7.0**
+- Use wireguard packages from Debian Backports instead of Debian Sid, these packages are more suitable for a stable distribution and have less impact on the system. Packages from unstable must be removed manually (including kernel) to make the switch on an existing system. Upgrading the role has no effect other than adding Debian Backports to the Apt repositories.
+- Fix reboot mechanism in Raspbian role, now also works without `molly-guard`
+
+
+
 **7.5.0**
 
 - `wireguard` package is now available for Ubuntu 18.04 in universe repository. Before that `ppa:wireguard/wireguard` was used but that one isn't available anymore. The install procedure for Ubuntu 18.04 and 20.04 is now the same as both can use `wireguard` metapackage now. The role takes care to remove `wireguard-dkms` package in favour of `wireguard` metapackage but it leaves the configuration file for `ppa:wireguard/wireguard` repository untouched. So it's up to you to remove that PPA. Either use `apt-add-repository --remove ppa:wireguard/wireguard` or remove the file manually at `/etc/apt/sources.list.d/` directory (you man need to run `apt-get update` afterwards).
