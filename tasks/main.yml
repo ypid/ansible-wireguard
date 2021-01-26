@@ -15,12 +15,15 @@
 
 # Installing and load WireGuard [[[1
 - include_tasks: "{{ item }}"
-  with_first_found:
-    - "setup-{{ ansible_distribution|lower }}-{{ ansible_distribution_major_version }}.yml"
-    - "setup-{{ ansible_distribution|lower }}-{{ ansible_distribution_version }}.yml"
-    - "setup-{{ ansible_distribution|lower }}-{{ ansible_distribution_release }}.yml"
-    - "setup-{{ ansible_distribution|lower }}.yml"
-    - "setup-{{ ansible_os_family|lower }}.yml"
+  vars:
+    params:
+      files:
+        - "setup-{{ ansible_distribution|lower }}-{{ ansible_distribution_major_version }}.yml"
+        - "setup-{{ ansible_distribution|lower }}-{{ ansible_distribution_version }}.yml"
+        - "setup-{{ ansible_distribution|lower }}-{{ ansible_distribution_release }}.yml"
+        - "setup-{{ ansible_distribution|lower }}.yml"
+        - "setup-{{ ansible_os_family|lower }}.yml"
+  loop: '{{ q("first_found", params, errors="ignore") }}'
   when: wireguard__config_target == "host"
 
 - name: Install patched version of wg-quick
@@ -64,6 +67,7 @@
     dest: '{{ wireguard_remote_directory }}'
     state: directory
     mode: 0700
+  delegate_to: '{{ "localhost" if (wireguard__config_target == "ansible_controller") else omit }}'
   tags:
     - wg-config
 
@@ -73,6 +77,7 @@
     state: 'directory'
     mode: '0700'
   when: wireguard__key_templating == "file"
+  delegate_to: '{{ "localhost" if (wireguard__config_target == "ansible_controller") else omit }}'
   tags:
     - wg-generate-keys
     - wg-config
@@ -109,6 +114,7 @@
     set_fact:
       wireguard__fact_private_key: '{{ (wireguard__register_private_key["content"] | b64decode).strip() }}'
   when: wireguard__secret_authority == "ansible_controller"
+  delegate_to: '{{ "localhost" if (wireguard__config_target == "ansible_controller") else omit }}'
 
 # Private key handling on remote [[[1
 - block:
@@ -132,6 +138,7 @@
     set_fact:
       wireguard__fact_private_key: "{{ wireguard__register_private_key.stdout }}"
   when: wireguard__secret_authority == "host"
+  delegate_to: '{{ "localhost" if (wireguard__config_target == "ansible_controller") else omit }}'
 
 # Save/remove private key from Ansible controller [[[1
 - name: Save WireGuard private key on Ansible controller
@@ -140,7 +147,7 @@
       {{ wireguard__fact_private_key }}
     dest: '{{ wireguard__secret_directory }}/{{ inventory_hostname }}.privkey'
   delegate_to: "localhost"
-  no_log: True
+  no_log: '{{ debops__no_log | d(True) }}'
   when: wireguard__secret_authority == "ansible_controller"
   tags:
     - wg-config
@@ -150,6 +157,7 @@
     dest: '{{ wireguard__secret_directory }}/{{ inventory_hostname }}.privkey'
     state: absent
   when: wireguard__secret_authority == "host"
+  delegate_to: '{{ "localhost" if (wireguard__config_target == "ansible_controller") else omit }}'
   tags:
     - wg-config
 
@@ -162,8 +170,9 @@
     owner: "{{ wireguard_conf_owner }}"
     group: "{{ wireguard_conf_group }}"
     mode: "{{ wireguard_conf_mode }}"
-  no_log: True
+  no_log: '{{ debops__no_log | d(True) }}'
   when: wireguard__key_templating == "file"
+  delegate_to: '{{ "localhost" if (wireguard__config_target == "ansible_controller") else omit }}'
   tags:
     - wg-config
   notify:
@@ -175,6 +184,7 @@
     stdin: "{{ wireguard__fact_private_key }}"
   register: wireguard__register_public_key
   changed_when: False
+  delegate_to: '{{ "localhost" if (wireguard__config_target == "ansible_controller") else omit }}'
   tags:
     - wg-config
 
@@ -219,7 +229,7 @@
         {% endfor %}
         {{ fact }}
   when: wireguard__secret_authority == "ansible_controller"
-  tags: test
+  delegate_to: '{{ "localhost" if (wireguard__config_target == "ansible_controller") else omit }}'
 
 - name: Download PSKs
   copy:
@@ -253,7 +263,21 @@
     src: 'etc/wireguard/wg.conf.j2'
     dest: '{{ wireguard_remote_directory + "/" + wireguard_interface + ".conf" }}'
     validate: '{{ role_path }}/files/usr/local/lib/wg-validate-config --file %s'
-  when: wireguard__config_target == "ansible_controller"
+  when: wireguard__config_target == "ansible_controller" and (platform not in ["opnsense", "pfsense"])
+  delegate_to: '{{ "localhost" if (wireguard__config_target == "ansible_controller") else omit }}'
+  tags:
+    - wg-config
+
+- name: Generate WireGuard configuration file on Ansible controller for OPNsense
+  template:
+    src: 'conf/config_{{ item }}_part.xml.j2'
+    dest: '{{ wireguard_remote_directory + "/" + wireguard_interface + "_" + item + ".xml" }}'
+    validate: 'xmllint --noout %s'
+  when: wireguard__config_target == "ansible_controller" and (platform in ["opnsense", "pfsense"])
+  delegate_to: '{{ "localhost" if (wireguard__config_target == "ansible_controller") else omit }}'
+  with_items:
+    - server
+    - client
   tags:
     - wg-config
 

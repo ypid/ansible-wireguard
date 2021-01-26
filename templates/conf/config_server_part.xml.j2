@@ -1,0 +1,25 @@
+{# Copyright (C)      2020 Robin Schneider <ypid@riseup.net>
+ # SPDX-License-Identifier: GPL-3.0-or-later
+ #}
+        <servers>
+          <server uuid="8867749e-40e9-4dc5-81c9-37aae519459f">
+            <enabled>1</enabled>
+            <name>{{ (wireguard_interface.split('_')[1]) }}</name>
+            <instance>0</instance>
+            <pubkey>{{ wireguard__fact_public_key }}</pubkey>
+            <privkey>{{ wireguard__fact_private_key }}</privkey>
+            <port>{{ wireguard_port }}</port>
+            <mtu/>
+            <dns/>
+            <tunneladdress>{{ wireguard_address }}</tunneladdress>
+{%   if wireguard_allowed_ips|d() %}
+            <disableroutes>0</disableroutes>
+            <gateway>{{ [ wireguard_address | ansible.netcommon.ipaddr('address') | ansible.netcommon.ipsubnet, wireguard_allowed_ips ] | flatten | map("trim") | join(",") }}</gateway>
+{%   endif %}
+            <peers> 
+{%- for host in wireguard__peers -%}
+00000000-0000-0000-9466-6bc088ef{{ "{:04d}".format(loop.index) }}
+{%- endfor -%}
+            </peers>
+          </server>
+        </servers>

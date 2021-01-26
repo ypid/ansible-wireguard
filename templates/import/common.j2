@@ -1,0 +1,53 @@
+{# Copyright (C) 2018-2020 Robert Wimmer
+ # Copyright (C)      2020-2021 Robin Schneider <ypid@riseup.net>
+ # SPDX-License-Identifier: GPL-3.0-or-later
+ #}
+{% macro print_peer_endpoint(host, format='wg-quick') %}
+{%   if (
+         hostvars[host].wireguard_dc is defined and
+         wireguard_dc is defined and
+         wireguard_dc['name'] != hostvars[host].wireguard_dc['name']
+       )
+%}
+{%     if format == "wg-quick" %}
+Endpoint = {{ hostvars[host].wireguard_dc['endpoint'] }}:{{ hostvars[host].wireguard_dc['port'] }}
+{%     elif format == "opnsense" %}
+            <serveraddress>{{ hostvars[host].wireguard_dc['endpoint'] }}</serveraddress>
+            <serverport>{{ hostvars[host].wireguard_dc['port'] }}</serverport>
+{%     endif %}
+{%   elif hostvars[host].wireguard_port is defined and hostvars[host].wireguard_port is number %}
+{%     if hostvars[host].wireguard_endpoint is defined and hostvars[host].wireguard_endpoint != "" %}
+{%       if format == "wg-quick" %}
+Endpoint = {{ hostvars[host].wireguard_endpoint }}:{{ hostvars[host].wireguard_port }}
+{%       elif format == "opnsense" %}
+            <serveraddress>{{ hostvars[host].wireguard_endpoint }}</serveraddress>
+            <serverport>{{ hostvars[host].wireguard_port }}</serverport>
+{%       endif %}
+{%     else %}
+{%       if format == "wg-quick" %}
+Endpoint = {{ host }}:{{ hostvars[host].wireguard_port }}
+{%       elif format == "opnsense" %}
+            <serveraddress>{{ wireguard_port }}</serveraddress>
+            <serverport>{{ hostvars[host].wireguard_port }}</serverport>
+{%       endif %}
+{%     endif %}
+{%   elif hostvars[host].wireguard_endpoint is defined and hostvars[host].wireguard_endpoint != "" %}
+{%     if format == "wg-quick" %}
+Endpoint = {{ hostvars[host].wireguard_endpoint }}:{{ wireguard_port }}
+{%     elif format == "opnsense" %}
+            <serveraddress>{{ hostvars[host].wireguard_endpoint }}</serveraddress>
+            <serverport>{{ wireguard_port }}</serverport>
+{%     endif %}
+{%   elif hostvars[host].wireguard_endpoint == "" %}
+{%     if format == "wg-quick" %}
+# No endpoint defined for this peer.
+{%     endif %}
+{%   else %}
+{%     if format == "wg-quick" %}
+Endpoint = {{ host }}:{{ wireguard_port }}
+{%     elif format == "opnsense" %}
+            <serveraddress>{{ host }}</serveraddress>
+            <serverport>{{ wireguard_port }}</serverport>
+{%     endif %}
+{%   endif %}
+{% endmacro %}

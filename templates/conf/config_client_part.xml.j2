@@ -1,0 +1,28 @@
+{# Copyright (C)      2020 Robin Schneider <ypid@riseup.net>
+ # SPDX-License-Identifier: GPL-3.0-or-later
+ #}
+{% import 'templates/import/common.j2' as wireguard__tpl_macros with context %}
+        <clients>
+{% for host in wireguard__peers %}
+          <client uuid="00000000-0000-0000-9466-6bc088ef{{ "{:04d}".format(loop.index) }}">
+            <enabled>1</enabled>
+            <name>{{ (wireguard_interface.split('_')[1]) + "Peer{:04d}".format(loop.index) }}</name>
+            <pubkey>{{ hostvars[host].wireguard__fact_public_key
+               |d(hostvars[host].ansible_local.wireguard.interface[hostvars[host].wireguard_interface].Interface.PublicKey) }}</pubkey>
+{%   if host in wireguard__fact_psks %}
+            <psk>{{ wireguard__fact_psks[host] }}</psk>
+{%   else %}
+            <psk/>
+{%   endif %}
+{%   if hostvars[host].wireguard_allowed_ips|d() %}
+            <tunneladdress>{{ [ hostvars[host].wireguard_address.split('/')[0] + "/32", hostvars[host].wireguard_allowed_ips ] | flatten | map("trim") | join(",") }}</tunneladdress>
+{%   else %}
+            <tunneladdress>{{ hostvars[host].wireguard_address.split('/')[0] }}/32</tunneladdress>
+{%   endif %}
+{{ wireguard__tpl_macros.print_peer_endpoint(host, format="opnsense") -}}
+{%   if hostvars[host].wireguard_persistent_keepalive is defined %}
+            <keepalive>{{ hostvars[host].wireguard_persistent_keepalive }}</keepalive>
+{%   endif %}
+          </client>
+{% endfor %}
+        </clients>

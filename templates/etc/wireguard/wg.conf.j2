@@ -4,6 +4,7 @@
  # SPDX-License-Identifier: GPL-3.0-or-later
  #}
 # {{ ansible_managed }}
+{% import 'templates/import/common.j2' as wireguard__tpl_macros with context %}
 
 [Interface]
 # {{ inventory_hostname }}
@@ -65,33 +66,14 @@ PublicKey = {{ hostvars[host].wireguard__fact_public_key
 PresharedKey = {{ wireguard__fact_psks[host] }}
 {%   endif %}
 {%   if hostvars[host].wireguard_allowed_ips|d() %}
-AllowedIPs = {{ [ hostvars[host].wireguard_allowed_ips ] | flatten | map("trim") | join(", ") }}
+AllowedIPs = {{ wireguard_address | ansible.netcommon.ipaddr('address') | ansible.netcommon.ipsubnet }}
 {%   else %}
-AllowedIPs = {{ hostvars[host].wireguard_address.split('/')[0] }}/32
+AllowedIPs = {{ wireguard_address | ansible.netcommon.ipaddr('address') | ansible.netcommon.ipsubnet }}
 {%   endif %}
 {%   if hostvars[host].wireguard_persistent_keepalive is defined %}
 PersistentKeepalive = {{ hostvars[host].wireguard_persistent_keepalive }}
 {%   endif %}
-{%   if (
-         hostvars[host].wireguard_dc is defined and
-         wireguard_dc is defined and
-         wireguard_dc['name'] != hostvars[host].wireguard_dc['name']
-       )
-%}
-Endpoint = {{ hostvars[host].wireguard_dc['endpoint'] }}:{{ hostvars[host].wireguard_dc['port'] }}
-{%   elif hostvars[host].wireguard_port is defined and hostvars[host].wireguard_port is number %}
-{%     if hostvars[host].wireguard_endpoint is defined and hostvars[host].wireguard_endpoint != "" %}
-Endpoint = {{ hostvars[host].wireguard_endpoint }}:{{ hostvars[host].wireguard_port }}
-{%     else %}
-Endpoint = {{ host }}:{{ hostvars[host].wireguard_port }}
-{%     endif %}
-{%   elif hostvars[host].wireguard_endpoint is defined and hostvars[host].wireguard_endpoint != "" %}
-Endpoint = {{ hostvars[host].wireguard_endpoint }}:{{ wireguard_port }}
-{%   elif hostvars[host].wireguard_endpoint == "" %}
-# No endpoint defined for this peer.
-{%   else %}
-Endpoint = {{ host }}:{{ wireguard_port }}
-{%   endif %}
+{{ wireguard__tpl_macros.print_peer_endpoint(host) }}
 {% endfor %}
 {% if wireguard_unmanaged_peers is defined %}
 
