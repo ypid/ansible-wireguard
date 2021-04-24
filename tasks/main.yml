@@ -330,6 +330,7 @@
     mode: '{{ wireguard__controller_host_mode
               if (wireguard__config_target == "ansible_controller")
               else "0755" }}'
+  when: wireguard__config_target == "host"
 
 - name: Save WireGuard local facts
   template:
@@ -350,10 +351,11 @@
               if (wireguard__config_target == "ansible_controller")
               else "0755" }}'
   register: wireguard__register_facts
+  when: wireguard__config_target == "host"
 
 - name: Update Ansible facts if they were modified
   setup:
     fact_path: '{{ (wireguard__controller_host_dir_path + "/etc/ansible/facts.d")
                    if (wireguard__config_target == "ansible_controller")
                    else omit }}'
-  when: wireguard__register_facts is changed
+  when: (wireguard__config_target == "host" and wireguard__register_facts is changed)
