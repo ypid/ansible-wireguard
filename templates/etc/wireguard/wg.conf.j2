@@ -66,9 +66,9 @@ PublicKey = {{ hostvars[host].wireguard__fact_public_key
 PresharedKey = {{ wireguard__fact_psks[host] }}
 {%   endif %}
 {%   if hostvars[host].wireguard_allowed_ips|d() %}
-AllowedIPs = {{ wireguard_address | ansible.netcommon.ipaddr('address') | ansible.netcommon.ipsubnet }}
+AllowedIPs = {{ [ hostvars[host].wireguard_address | ansible.netcommon.ipaddr('address') | ansible.netcommon.ipsubnet, hostvars[host].wireguard_allowed_ips ] | flatten | map("trim") | join(", ") }}
 {%   else %}
-AllowedIPs = {{ wireguard_address | ansible.netcommon.ipaddr('address') | ansible.netcommon.ipsubnet }}
+AllowedIPs = {{ hostvars[host].wireguard_address | ansible.netcommon.ipaddr('address') | ansible.netcommon.ipsubnet }}
 {%   endif %}
 {%   if hostvars[host].wireguard_persistent_keepalive is defined %}
 PersistentKeepalive = {{ hostvars[host].wireguard_persistent_keepalive }}

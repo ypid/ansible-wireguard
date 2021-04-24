@@ -15,9 +15,9 @@
             <psk/>
 {%   endif %}
 {%   if hostvars[host].wireguard_allowed_ips|d() %}
-            <tunneladdress>{{ [ hostvars[host].wireguard_address.split('/')[0] + "/32", hostvars[host].wireguard_allowed_ips ] | flatten | map("trim") | join(",") }}</tunneladdress>
+            <tunneladdress>{{ [ hostvars[host].wireguard_address | ansible.netcommon.ipaddr('address') | ansible.netcommon.ipsubnet, hostvars[host].wireguard_allowed_ips ] | flatten | map("trim") | join(",") }}</tunneladdress>
 {%   else %}
-            <tunneladdress>{{ hostvars[host].wireguard_address.split('/')[0] }}/32</tunneladdress>
+            <tunneladdress>{{ hostvars[host].wireguard_address | ansible.netcommon.ipaddr('address') | ansible.netcommon.ipsubnet }}</tunneladdress>
 {%   endif %}
 {{ wireguard__tpl_macros.print_peer_endpoint(host, format="opnsense") -}}
 {%   if hostvars[host].wireguard_persistent_keepalive is defined %}
